@@ -132,7 +132,7 @@ export default function MatchPage() {
 
   if (results) {
     return (
-      <div className="container" style={{ paddingBottom: 80 }}>
+      <div className="container match-page" style={{ paddingBottom: 80, paddingLeft: "var(--container-px)", paddingRight: "var(--container-px)" }}>
         <div style={{ padding: "60px 0 40px", textAlign: "center" }}>
           <div style={{ display: "inline-flex", padding: "8px 16px", background: "var(--color-amber-100)", borderRadius: "var(--radius-full)", marginBottom: 16 }}>
             <Sparkles size={16} color="var(--color-amber-600)" />
@@ -150,7 +150,7 @@ export default function MatchPage() {
           </button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 32 }}>
+        <div className="grid-cols-mobile">
           {results.slice(0, 6).map((res, i) => {
             const pet = PETS.find(p => p.id === res.petId);
             if (!pet) return null;
@@ -170,12 +170,12 @@ export default function MatchPage() {
   }
 
   return (
-    <div className="container" style={{ 
+    <div className="container match-page" style={{ 
       minHeight: "calc(100vh - 64px)", 
       display: "flex", 
       alignItems: "center", 
       justifyContent: "center",
-      padding: "40px 0"
+      padding: "20px var(--container-px)"
     }}>
       <div style={{ width: "100%", maxWidth: 640 }}>
         
@@ -238,7 +238,8 @@ export default function MatchPage() {
                 {STEPS[currentStep].question}
               </h1>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* ... existing options mapping ... */}
                 {STEPS[currentStep].options.map((opt) => {
                   const Icon = opt.icon;
                   const isSelected = answers[STEPS[currentStep].id] === opt.id;

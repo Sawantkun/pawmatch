@@ -32,9 +32,10 @@ interface PetCardProps {
   index?: number;
   matchScore?: number;
   matchReason?: string;
+  viewMode?: "grid" | "list";
 }
 
-export function PetCard({ pet, index = 0, matchScore, matchReason }: PetCardProps) {
+export function PetCard({ pet, index = 0, matchScore, matchReason, viewMode = "grid" }: PetCardProps) {
   const { user, toggleSavePet } = useAuth();
   const isSaved = user?.savedPets?.includes(pet.id) ?? false;
 
@@ -55,9 +56,9 @@ export function PetCard({ pet, index = 0, matchScore, matchReason }: PetCardProp
       transition={{ duration: 0.4, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
     >
       <Link href={`/pets/${pet.id}`} style={{ display: "block" }}>
-        <div className="card" style={{ cursor: "pointer", position: "relative" }}>
+        <div className={`card ${viewMode === "list" ? "pet-card-list" : ""}`} style={{ cursor: "pointer", position: "relative", display: "flex", flexDirection: viewMode === "list" ? "row" : "column", overflow: "hidden" }}>
           {/* Photo */}
-          <div style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden" }}>
+          <div style={{ position: "relative", aspectRatio: viewMode === "list" ? "1/1" : "4/3", width: viewMode === "list" ? "240px" : "100%", flexShrink: 0, overflow: "hidden" }} className="pet-card-image">
             <img
               src={pet.photos[0]}
               alt={pet.name}
@@ -135,7 +136,7 @@ export function PetCard({ pet, index = 0, matchScore, matchReason }: PetCardProp
                 </p>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <p style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--color-amber-600)" }}>
+                <p style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--color-amber-600)" }}>
                   ${pet.adoptionFee}
                 </p>
                 <p style={{ fontSize: "0.72rem", color: "var(--color-text-light)" }}>adoption fee</p>

@@ -87,8 +87,8 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
         </button>
       </div>
 
-      <div className="container">
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 48, alignItems: "start" }}>
+      <div className="container pet-detail-container">
+        <div className="grid-layout" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 48, alignItems: "start" }}>
           
           {/* ── Left Column: Media & Bio ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
@@ -207,7 +207,7 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
           </div>
 
           {/* ── Right Column: Application & Shelter ── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 32, position: "sticky", top: 100 }}>
+          <div className="pet-detail-sticky" style={{ display: "flex", flexDirection: "column", gap: 32, position: "sticky", top: 100 }}>
             
             {/* Header Info */}
             <div>
@@ -308,16 +308,25 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
         </div>
       </div>
       
-      <style>{`
+      {/* Mobile Floating Actions */}
+      <div className="mobile-only mobile-actions-bar">
+        <button onClick={handleApply} disabled={isApplying} className="btn btn-primary">
+          {isApplying ? "..." : "Apply"}
+        </button>
+        <button onClick={startChat} className="btn btn-secondary">
+          <MessageCircle size={18} />
+        </button>
+        <button onClick={handleSave} className="btn btn-secondary">
+          <Heart size={18} fill={isSaved ? "var(--color-rose-500)" : "none"} color={isSaved ? "var(--color-rose-500)" : "currentColor"} />
+        </button>
+      </div>
+
+      <style jsx>{`
         @media (max-width: 968px) {
-          div[style*="grid-template-columns: 1.2fr 1fr"] {
-            grid-template-columns: 1fr !important;
-            gap: 40px !important;
-          }
-          div[style*="position: sticky"] {
-            position: relative !important;
-            top: 0 !important;
-          }
+          .mobile-only { display: flex !important; }
+        }
+        @media (min-width: 969px) {
+          .mobile-only { display: none !important; }
         }
       `}</style>
     </div>

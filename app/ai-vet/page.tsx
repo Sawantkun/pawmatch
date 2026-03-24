@@ -93,7 +93,7 @@ export default function AIVetPage() {
   };
 
   return (
-    <div className="container" style={{ height: "calc(100vh - 120px)", padding: "20px 0", display: "flex", gap: 32 }}>
+    <div className="container vet-page-container" style={{ height: "calc(100vh - 120px)", padding: "20px var(--container-px)", display: "flex", gap: 32 }}>
       
       {/* ── Left Side: Resources & Topics ── */}
       <div className="desktop-only" style={{ width: 320, display: "flex", flexDirection: "column", gap: 24 }}>
@@ -154,10 +154,10 @@ export default function AIVetPage() {
       </div>
 
       {/* ── Main Chat Interface ── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "var(--radius-xl)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
+      <div className="vet-chat-container" style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--color-surface)", borderRadius: "var(--radius-xl)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
         
         {/* Chat Header */}
-        <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border)", background: "var(--color-surface)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="vet-chat-header" style={{ padding: "16px 24px", borderBottom: "1px solid var(--color-border)", background: "var(--color-surface)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 40, height: 40, background: "var(--color-teal-100)", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-teal-600)" }}>
               <Bot size={24} />
@@ -176,7 +176,7 @@ export default function AIVetPage() {
         </div>
 
         {/* Scrollable Messages */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="vet-messages" style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
           {messages.map((msg) => {
             const isBot = msg.role === "bot";
             return (
@@ -233,7 +233,7 @@ export default function AIVetPage() {
         </div>
 
         {/* Chat Input */}
-        <div style={{ padding: "16px 24px 24px", borderTop: "1px solid var(--color-border)" }}>
+        <div className="vet-input-area" style={{ padding: "16px 24px 24px", borderTop: "1px solid var(--color-border)" }}>
           <form 
             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
             style={{ display: "flex", gap: 12, background: "var(--color-surface-2)", padding: "8px 12px", borderRadius: "var(--radius-xl)", border: "1px solid transparent", transition: "all 0.2s" }}
@@ -257,7 +257,7 @@ export default function AIVetPage() {
               <Send size={18} fill="white" strokeWidth={0} />
             </button>
           </form>
-          <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+          <div className="vet-popular-topics" style={{ display: "flex", gap: 12, marginTop: 12 }}>
             <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>Popular:</span>
             <button onClick={() => setInputText("What human foods are toxic to dogs?")} style={{ fontSize: "0.75rem", color: "var(--color-teal-600)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Toxic foods</button>
             <button onClick={() => setInputText("How to tell if my cat has a fever?")} style={{ fontSize: "0.75rem", color: "var(--color-teal-600)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Fever signs</button>

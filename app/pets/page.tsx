@@ -55,7 +55,7 @@ export default function PetsPage() {
         gap: 16,
         marginBottom: 32,
         position: "sticky",
-        top: 80,
+        top: 65,
         zIndex: 10,
         background: "var(--color-bg)",
         padding: "8px 0",
@@ -183,7 +183,7 @@ export default function PetsPage() {
           gap: 24,
         }}>
           {filteredPets.map((pet, i) => (
-            <PetCard key={pet.id} pet={pet} index={i} />
+            <PetCard key={pet.id} pet={pet} index={i} viewMode={viewMode} />
           ))}
         </div>
       ) : (

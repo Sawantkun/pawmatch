@@ -48,7 +48,7 @@ export default function DashboardPage() {
   const isShelter = user.role === "shelter" || user.role === "admin";
 
   return (
-    <div className="container" style={{ padding: "40px 0 80px" }}>
+    <div className="container dashboard-page" style={{ padding: "40px var(--container-px) 80px" }}>
       {/* ── Header ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 32 }}>
         <div>
@@ -187,7 +187,8 @@ export default function DashboardPage() {
         {isShelter && activeTab === "pets" && (
           <motion.div key="pets" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", minWidth: 600 }}>
                 <thead style={{ background: "var(--color-surface-2)", borderBottom: "1px solid var(--color-border)" }}>
                   <tr>
                     <th style={{ padding: "16px 24px", fontWeight: 600, fontSize: "0.85rem", color: "var(--color-text-muted)" }}>Pet</th>
@@ -227,6 +228,7 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
+          </div>
           </motion.div>
         )}
 
