@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -14,7 +14,7 @@ import { Conversation, ChatMessage } from "@/types";
 import toast from "react-hot-toast";
 import Link from "next/link";
 
-export default function ChatPage() {
+function ChatContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const petIdParam = searchParams.get("petId");
@@ -227,7 +227,7 @@ export default function ChatPage() {
                     <span style={{ 
                       width: 18, height: 18, borderRadius: "50%", background: "var(--color-amber-500)", 
                       color: "white", fontSize: "0.7rem", fontWeight: 700, display: "flex", 
-                      alignItems: "center", justify: "center", flexShrink: 0, marginLeft: 8 
+                      alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 8 
                     }}>
                       {conv.unreadCount}
                     </span>
@@ -386,5 +386,17 @@ export default function ChatPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="container" style={{ textAlign: "center", padding: "100px 0" }}>
+        <p style={{ color: "var(--color-text-muted)" }}>Loading conversations...</p>
+      </div>
+    }>
+      <ChatContent />
+    </Suspense>
   );
 }
