@@ -7,7 +7,6 @@ import {
   Search, ChevronRight, MessageSquare, HeartPulse
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { PETS } from "@/data/mockData";
 import Link from "next/link";
 
 interface Message {
@@ -48,43 +47,48 @@ export default function AIVetPage() {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const handleSend = (text: string = inputText) => {
-    if (!text.trim()) return;
+  const handleSend = async (text: string = inputText) => {
+    if (!text.trim() || isTyping) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      text: text,
-      timestamp: new Date().toISOString()
+      text,
+      timestamp: new Date().toISOString(),
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInputText("");
     setIsTyping(true);
 
-    // Simulate AI response logic
-    setTimeout(() => {
-      let botResponse = "";
-      const lowerText = text.toLowerCase();
+    try {
+      // Build OpenAI-format history (skip the initial bot greeting)
+      const history = updatedMessages
+        .filter((m) => !(m.role === "bot" && m.id === "1"))
+        .map((m) => ({ role: m.role === "bot" ? "assistant" : "user", content: m.text }));
 
-      if (lowerText.includes("vomit") || lowerText.includes("sick")) {
-        botResponse = "I'm sorry to hear your pet is feeling unwell. If they have vomited more than twice in 24 hours or seem lethargic, please contact a local emergency vet immediately. In the meantime, ensure they have access to fresh water and avoid feeding for 6-12 hours.";
-      } else if (lowerText.includes("food") || lowerText.includes("eat") || lowerText.includes("diet")) {
-        botResponse = "Proper nutrition is key! For dogs, high-quality protein should be the first ingredient. Avoid grapes, chocolate, and onions as they are toxic. Would you like me to recommend a diet based on your pet's breed?";
-      } else if (lowerText.includes("scratch") || lowerText.includes("itch")) {
-        botResponse = "Frequent scratching can be caused by allergies, fleas, or skin infections. Have you noticed any redness or hair loss? I recommend checking for flea dirt or consulting a vet for an allergy test.";
-      } else {
-        botResponse = "That's a great question. As an AI assistant, I can provide general health tips and triage advice. For specific medical diagnosis, I always recommend seeing a licensed veterinarian. Is there something specific about your pet's health you're worried about?";
-      }
+      const res = await fetch("/api/ai-vet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history }),
+      });
 
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: "bot",
-        text: botResponse,
-        timestamp: new Date().toISOString()
-      }]);
+      const data = await res.json();
+      const reply = data.reply ?? "Sorry, I couldn't generate a response. Please try again.";
+
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), role: "bot", text: reply, timestamp: new Date().toISOString() },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), role: "bot", text: "Sorry, something went wrong. Please check your connection and try again.", timestamp: new Date().toISOString() },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const formatTime = (iso: string) => {
@@ -93,7 +97,7 @@ export default function AIVetPage() {
   };
 
   return (
-    <div className="container vet-page-container" style={{ height: "calc(100vh - 120px)", padding: "20px var(--container-px)", display: "flex", gap: 32 }}>
+    <div className="container vet-page-container" style={{ height: "calc(100vh - 64px)", paddingTop: 32, paddingBottom: 20, display: "flex", gap: 32 }}>
       
       {/* ── Left Side: Resources & Topics ── */}
       <div className="desktop-only" style={{ width: 320, display: "flex", flexDirection: "column", gap: 24 }}>

@@ -1,5 +1,13 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from "react";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { getUser, createUserDoc, updateUserDoc, UserDoc } from "@/lib/firestore";
 
 export type UserRole = "adopter" | "shelter" | "admin";
 
@@ -26,7 +34,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, role?: UserRole) => Promise<void>;
   logout: () => void;
   toggleSavePet: (petId: string) => void;
   updatePreferences: (prefs: User["preferences"]) => void;
@@ -34,89 +42,85 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Mock demo users
-const MOCK_USERS: User[] = [
-  {
-    id: "user-1",
-    name: "Alex Rivera",
-    email: "alex@demo.com",
-    role: "adopter",
-    savedPets: ["pet-3"],
-    preferences: {
-      lifestyle: "active",
-      homeType: "house",
-      activityLevel: "high",
-      experience: "some",
-      preferredSize: "medium",
-      preferredAge: "adult",
-      preferredSpecies: "dog",
-      allergies: false,
-    },
-  },
-  {
-    id: "shelter-1",
-    name: "Sunny Paws Shelter",
-    email: "shelter@demo.com",
-    role: "shelter",
-    savedPets: [],
-  },
-  {
-    id: "admin-1",
-    name: "Admin User",
-    email: "admin@demo.com",
-    role: "admin",
-    savedPets: [],
-  },
-];
+// Demo email → role mapping
+function getRoleFromEmail(email: string): UserRole {
+  if (email === "shelter@demo.com") return "shelter";
+  if (email === "admin@demo.com") return "admin";
+  return "adopter";
+}
+
+// Demo email → display name mapping
+function getNameFromEmail(email: string): string {
+  if (email === "alex@demo.com") return "Alex Rivera";
+  if (email === "shelter@demo.com") return "Sunny Paws Shelter";
+  if (email === "admin@demo.com") return "Admin User";
+  return email.split("@")[0];
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Restore session from localStorage
-    const stored = localStorage.getItem("pawmatch_user");
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {}
-    }
-    setIsLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        try {
+          const userData = await getUser(fbUser.uid);
+          if (userData) {
+            setUser(userData as User);
+          } else {
+            setUser(null);
+          }
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+    return unsubscribe;
   }, []);
 
-  const login = async (email: string, _password: string) => {
-    setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    const found = MOCK_USERS.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
-    if (!found) {
-      setIsLoading(false);
-      throw new Error("Invalid email or password. Try alex@demo.com, shelter@demo.com, or admin@demo.com");
+  const login = async (email: string, password: string) => {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    let userData = await getUser(cred.user.uid);
+    // Auto-create Firestore doc for demo accounts if missing
+    if (!userData) {
+      const newDoc: UserDoc = {
+        id: cred.user.uid,
+        name: getNameFromEmail(email),
+        email,
+        role: getRoleFromEmail(email),
+        savedPets: [],
+      };
+      await createUserDoc(cred.user.uid, newDoc);
+      userData = newDoc;
     }
-    setUser(found);
-    localStorage.setItem("pawmatch_user", JSON.stringify(found));
-    setIsLoading(false);
+    setUser(userData as User);
   };
 
-  const signup = async (name: string, email: string, _password: string) => {
-    setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 900));
-    const newUser: User = {
-      id: `user-${Date.now()}`,
+  const signup = async (
+    name: string,
+    email: string,
+    password: string,
+    role: UserRole = "adopter"
+  ) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    const newDoc: UserDoc = {
+      id: cred.user.uid,
       name,
       email,
-      role: "adopter",
+      role,
       savedPets: [],
     };
-    setUser(newUser);
-    localStorage.setItem("pawmatch_user", JSON.stringify(newUser));
-    setIsLoading(false);
+    await createUserDoc(cred.user.uid, newDoc);
+    setUser(newDoc as User);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await signOut(auth);
     setUser(null);
-    localStorage.removeItem("pawmatch_user");
   };
 
   const toggleSavePet = (petId: string) => {
@@ -126,14 +130,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       : [...user.savedPets, petId];
     const updated = { ...user, savedPets: saved };
     setUser(updated);
-    localStorage.setItem("pawmatch_user", JSON.stringify(updated));
+    updateUserDoc(user.id, { savedPets: saved }).catch(console.error);
   };
 
   const updatePreferences = (prefs: User["preferences"]) => {
     if (!user) return;
     const updated = { ...user, preferences: prefs };
     setUser(updated);
-    localStorage.setItem("pawmatch_user", JSON.stringify(updated));
+    updateUserDoc(user.id, { preferences: prefs }).catch(console.error);
   };
 
   return (

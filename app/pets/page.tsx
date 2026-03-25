@@ -1,10 +1,11 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, SlidersHorizontal, X, Map as MapIcon, Grid, List as ListIcon, ChevronDown } from "lucide-react";
-import { PETS, filterPets } from "@/data/mockData";
+import { Search, SlidersHorizontal, Grid, List as ListIcon, Loader2 } from "lucide-react";
 import { PetCard } from "@/components/pets/PetCard";
 import { Pet } from "@/types";
+import { getAllPets } from "@/lib/firestore";
+import Link from "next/link";
 
 const SPECIES_OPTIONS = [
   { id: "all", label: "All Species" },
@@ -27,14 +28,27 @@ export default function PetsPage() {
   const [size, setSize] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [allPets, setAllPets] = useState<Pet[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getAllPets()
+      .then(setAllPets)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredPets = useMemo(() => {
-    return filterPets({
-      search,
-      species,
-      size,
+    return allPets.filter((pet) => {
+      if (species !== "all" && pet.species !== species) return false;
+      if (size !== "all" && pet.size !== size) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!pet.name.toLowerCase().includes(q) && !pet.breed.toLowerCase().includes(q)) return false;
+      }
+      return true;
     });
-  }, [search, species, size]);
+  }, [allPets, search, species, size]);
 
   const activeFiltersCount = (species !== "all" ? 1 : 0) + (size !== "all" ? 1 : 0);
 
@@ -44,7 +58,7 @@ export default function PetsPage() {
       <div className="page-header" style={{ marginBottom: 24, borderBottom: "none" }}>
         <h1 className="title-xl">Browse Pets</h1>
         <p style={{ color: "var(--color-text-muted)", marginTop: 8 }}>
-          Showing {filteredPets.length} pets available for adoption
+          {loading ? "Loading pets..." : `Showing ${filteredPets.length} pets available for adoption`}
         </p>
       </div>
 
@@ -127,11 +141,7 @@ export default function PetsPage() {
                   <label className="input-label">Species</label>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
                     {SPECIES_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setSpecies(opt.id)}
-                        className={`tag ${species === opt.id ? "active" : ""}`}
-                      >
+                      <button key={opt.id} onClick={() => setSpecies(opt.id)} className={`tag ${species === opt.id ? "active" : ""}`}>
                         {opt.label}
                       </button>
                     ))}
@@ -141,11 +151,7 @@ export default function PetsPage() {
                   <label className="input-label">Size</label>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
                     {SIZE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        onClick={() => setSize(opt.id)}
-                        className={`tag ${size === opt.id ? "active" : ""}`}
-                      >
+                      <button key={opt.id} onClick={() => setSize(opt.id)} className={`tag ${size === opt.id ? "active" : ""}`}>
                         {opt.label}
                       </button>
                     ))}
@@ -153,20 +159,10 @@ export default function PetsPage() {
                 </div>
               </div>
               <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--color-border)", display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                <button
-                  onClick={() => {
-                    setSpecies("all");
-                    setSize("all");
-                    setSearch("");
-                  }}
-                  className="btn btn-ghost btn-sm"
-                >
+                <button onClick={() => { setSpecies("all"); setSize("all"); setSearch(""); }} className="btn btn-ghost btn-sm">
                   Reset All
                 </button>
-                <button
-                  onClick={() => setShowFilters(false)}
-                  className="btn btn-primary btn-sm"
-                >
+                <button onClick={() => setShowFilters(false)} className="btn btn-primary btn-sm">
                   Done
                 </button>
               </div>
@@ -175,8 +171,12 @@ export default function PetsPage() {
         </AnimatePresence>
       </div>
 
-      {/* Grid */}
-      {filteredPets.length > 0 ? (
+      {/* Loading */}
+      {loading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "80px 0" }}>
+          <Loader2 size={40} style={{ animation: "spin-slow 1s linear infinite", color: "var(--color-amber-500)" }} />
+        </div>
+      ) : filteredPets.length > 0 ? (
         <div style={{
           display: "grid",
           gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(280px, 1fr))" : "1fr",
@@ -186,6 +186,25 @@ export default function PetsPage() {
             <PetCard key={pet.id} pet={pet} index={i} viewMode={viewMode} />
           ))}
         </div>
+      ) : allPets.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{
+            textAlign: "center",
+            padding: "80px 24px",
+            background: "var(--color-surface-2)",
+            borderRadius: "var(--radius-xl)",
+            border: "1.5px dashed var(--color-border)",
+          }}
+        >
+          <div style={{ fontSize: "3rem", marginBottom: 16 }}>🐾</div>
+          <h3 className="title-lg">No pets listed yet</h3>
+          <p style={{ color: "var(--color-text-muted)", marginTop: 8, maxWidth: 360, margin: "8px auto 24px" }}>
+            Shelters haven't posted any pets yet. Check back soon or sign up as a shelter to post listings.
+          </p>
+          <Link href="/auth/signup" className="btn btn-primary">Sign Up as a Shelter</Link>
+        </motion.div>
       ) : (
         <motion.div
           initial={{ opacity: 0 }}
@@ -201,16 +220,9 @@ export default function PetsPage() {
           <div style={{ fontSize: "3rem", marginBottom: 16 }}>😿</div>
           <h3 className="title-lg">No pets found</h3>
           <p style={{ color: "var(--color-text-muted)", marginTop: 8, maxWidth: 320, margin: "8px auto 24px" }}>
-            We couldn't find any pets matching your current filters. Try adjusting your search or resetting.
+            Try adjusting your search or resetting filters.
           </p>
-          <button
-            onClick={() => {
-              setSpecies("all");
-              setSize("all");
-              setSearch("");
-            }}
-            className="btn btn-primary"
-          >
+          <button onClick={() => { setSpecies("all"); setSize("all"); setSearch(""); }} className="btn btn-primary">
             Clear All Filters
           </button>
         </motion.div>

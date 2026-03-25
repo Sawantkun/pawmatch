@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 import { ArrowRight, Sparkles, Shield, MessageCircle, MapPin, Heart, Zap } from "lucide-react";
-import { PETS } from "@/data/mockData";
+import { getAllPets } from "@/lib/firestore";
 import { PetCard } from "@/components/pets/PetCard";
+import { Pet } from "@/types";
 
 const STATS = [
   { value: "2,400+", label: "Pets Adopted" },
@@ -94,7 +96,13 @@ function FadeUp({ children, delay = 0, className = "", style = {} }: { children:
 }
 
 export default function HomePage() {
-  const featuredPets = PETS.filter((p) => p.status === "available").slice(0, 4);
+  const [featuredPets, setFeaturedPets] = useState<Pet[]>([]);
+
+  useEffect(() => {
+    getAllPets()
+      .then((pets) => setFeaturedPets(pets.filter((p) => p.status === "available").slice(0, 4)))
+      .catch(() => {});
+  }, []);
 
   return (
     <div>
@@ -188,12 +196,16 @@ export default function HomePage() {
             {/* Main card */}
             <div style={{ position: "relative", zIndex: 2, maxWidth: 520, width: "100%" }}>
               <div className="card" style={{ overflow: "visible", transform: "rotate(-1deg)" }}>
-                <img src={PETS[0].photos[0]} alt={PETS[0].name} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: "var(--radius-lg) var(--radius-lg) 0 0" }} />
+                {featuredPets[0]?.photos?.[0] ? (
+                  <img src={featuredPets[0].photos[0]} alt={featuredPets[0].name} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: "var(--radius-lg) var(--radius-lg) 0 0" }} />
+                ) : (
+                  <div style={{ width: "100%", aspectRatio: "4/3", background: "var(--color-amber-50)", borderRadius: "var(--radius-lg) var(--radius-lg) 0 0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "5rem" }}>🐾</div>
+                )}
                 <div style={{ padding: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <h3 style={{ fontWeight: 700 }}>🐕 {PETS[0].name}</h3>
-                      <p style={{ fontSize: "0.8rem", color: "var(--color-text-muted)" }}>{PETS[0].breed}</p>
+                      <h3 style={{ fontWeight: 700 }}>🐕 {featuredPets[0]?.name ?? "Find your pet"}</h3>
+                      <p style={{ fontSize: "0.8rem", color: "var(--color-text-muted)" }}>{featuredPets[0]?.breed ?? "Browse available pets"}</p>
                     </div>
                     <span className="badge badge-teal">Available</span>
                   </div>

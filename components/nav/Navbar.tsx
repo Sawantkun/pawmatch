@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Heart, MessageCircle, LayoutDashboard, Search, Menu, X, LogOut, User, Sparkles, Stethoscope } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { CONVERSATIONS } from "@/data/mockData";
+import { getConversationsByUser, getConversationsByShelterId } from "@/lib/firestore";
 
 const NAV_ITEMS = [
   { href: "/pets", label: "Browse", icon: Search },
@@ -20,8 +20,15 @@ export function Navbar() {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [totalUnread, setTotalUnread] = useState(0);
 
-  const totalUnread = CONVERSATIONS.reduce((acc, c) => acc + c.unreadCount, 0);
+  useEffect(() => {
+    if (!user) { setTotalUnread(0); return; }
+    const fetch = user.role === "shelter"
+      ? getConversationsByShelterId(user.id)
+      : getConversationsByUser(user.id);
+    fetch.then((convs) => setTotalUnread(convs.reduce((acc, c) => acc + (c.unreadCount || 0), 0))).catch(() => {});
+  }, [user]);
 
   const handleLogout = () => {
     logout();

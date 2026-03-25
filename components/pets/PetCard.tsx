@@ -59,6 +59,7 @@ export function PetCard({ pet, index = 0, matchScore, matchReason, viewMode = "g
         <div className={`card ${viewMode === "list" ? "pet-card-list" : ""}`} style={{ cursor: "pointer", position: "relative", display: "flex", flexDirection: viewMode === "list" ? "row" : "column", overflow: "hidden" }}>
           {/* Photo */}
           <div style={{ position: "relative", aspectRatio: viewMode === "list" ? "1/1" : "4/3", width: viewMode === "list" ? "240px" : "100%", flexShrink: 0, overflow: "hidden" }} className="pet-card-image">
+            {pet.photos?.[0] ? (
             <img
               src={pet.photos[0]}
               alt={pet.name}
@@ -66,6 +67,11 @@ export function PetCard({ pet, index = 0, matchScore, matchReason, viewMode = "g
               onMouseOver={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1.04)")}
               onMouseOut={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1)")}
             />
+            ) : (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-surface-2)", fontSize: "3rem" }}>
+              {SPECIES_EMOJI[pet.species] ?? "🐾"}
+            </div>
+            )}
             {/* Status badge */}
             <div style={{ position: "absolute", top: 12, left: 12 }}>
               <span className={`badge ${STATUS_COLOR[pet.status]}`} style={{ textTransform: "capitalize" }}>
@@ -155,13 +161,13 @@ export function PetCard({ pet, index = 0, matchScore, matchReason, viewMode = "g
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.78rem", color: "var(--color-text-muted)" }}>
                 <MapPin size={12} />
-                <span>{pet.location.city}</span>
+                <span>{pet.location?.city ?? "—"}</span>
               </div>
             </div>
 
             {/* Traits */}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-              {pet.traits.slice(0, 3).map((t) => (
+              {(pet.traits ?? []).slice(0, 3).map((t) => (
                 <span key={t} className="tag" style={{ fontSize: "0.72rem", padding: "3px 8px", cursor: "default" }}>
                   {t}
                 </span>

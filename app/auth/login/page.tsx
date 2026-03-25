@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const { login, signup } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,16 +31,45 @@ export default function LoginPage() {
     }
   };
 
+  const DEMO_NAMES: Record<string, string> = {
+    "alex@demo.com": "Alex Rivera",
+    "shelter@demo.com": "Sunny Paws Shelter",
+    "admin@demo.com": "Admin User",
+  };
+  const DEMO_ROLES: Record<string, "adopter" | "shelter" | "admin"> = {
+    "alex@demo.com": "adopter",
+    "shelter@demo.com": "shelter",
+    "admin@demo.com": "admin",
+  };
+
   const demoLogin = async (demoEmail: string, label: string) => {
     setEmail(demoEmail);
     setPassword("demo123");
     setLoading(true);
+    setError("");
     try {
       await login(demoEmail, "demo123");
       toast.success(`Signed in as ${label} 🐾`);
       router.push(label === "Shelter" ? "/dashboard" : "/pets");
-    } catch {
-      setError("Demo login failed");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Account doesn't exist yet — auto-create it
+      if (msg.includes("user-not-found") || msg.includes("invalid-credential") || msg.includes("INVALID_LOGIN_CREDENTIALS") || msg.includes("auth/invalid-credential")) {
+        try {
+          await signup(
+            DEMO_NAMES[demoEmail] || label,
+            demoEmail,
+            "demo123",
+            DEMO_ROLES[demoEmail] || "adopter"
+          );
+          toast.success(`Demo account created! Signed in as ${label} 🐾`);
+          router.push(label === "Shelter" ? "/dashboard" : "/pets");
+        } catch (createErr) {
+          setError(`Demo setup failed: ${createErr instanceof Error ? createErr.message : String(createErr)}`);
+        }
+      } else {
+        setError(msg || "Login failed");
+      }
     } finally {
       setLoading(false);
     }

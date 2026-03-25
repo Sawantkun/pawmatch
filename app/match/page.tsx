@@ -6,9 +6,11 @@ import {
   Home, Users, Zap, Heart, Info, Loader2,
   Dog, Cat, Rabbit, Bird, PawPrint
 } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { PETS } from "@/data/mockData";
+import { getAllPets } from "@/lib/firestore";
 import { PetCard } from "@/components/pets/PetCard";
+import { Pet } from "@/types";
 import toast from "react-hot-toast";
 
 const STEPS = [
@@ -59,7 +61,7 @@ export default function MatchPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isMatching, setIsMatching] = useState(false);
-  const [results, setResults] = useState<{ petId: string; score: number; reason: string }[] | null>(null);
+  const [results, setResults] = useState<{ pet: Pet; score: number; reason: string }[] | null>(null);
 
   const handleSelect = (optionId: string) => {
     const stepId = STEPS[currentStep].id;
@@ -82,36 +84,34 @@ export default function MatchPage() {
 
   const runMatch = async () => {
     setIsMatching(true);
-    // Simulate AI processing
-    await new Promise(r => setTimeout(r, 2500));
-    
-    // In a real app, we would call Gemini here.
-    // Let's mock the ranking based on our answers.
-    const mockResults = PETS.map(pet => {
-      let score = 70 + Math.floor(Math.random() * 25); // Baseline 70-95
-      
-      // Basic matching logic for demo
-      if (answers.preferredSpecies && pet.species !== answers.preferredSpecies) score -= 30;
-      if (answers.preferredSize && pet.size !== answers.preferredSize) score -= 10;
-      if (answers.lifestyle === "active" && pet.traits.includes("Energetic")) score += 5;
-      if (answers.lifestyle === "calm" && pet.traits.includes("Calm")) score += 5;
-      
-      const reasons = [
-        `Matches your ${answers.lifestyle} lifestyle perfectly.`,
-        `Great fit for a ${answers.homeType} environment.`,
-        `Complements your activity level and space.`,
-        `${pet.name}'s personality aligns with your preferences.`
-      ];
+    try {
+      const pets = await getAllPets();
+      await new Promise((r) => setTimeout(r, 1500)); // brief UX pause
 
-      return {
-        petId: pet.id,
-        score: Math.min(Math.max(score, 0), 99),
-        reason: reasons[Math.floor(Math.random() * reasons.length)]
-      };
-    }).sort((a, b) => b.score - a.score);
+      const scored = pets
+        .filter((p) => p.status === "available")
+        .map((pet) => {
+          let score = 70 + Math.floor(Math.random() * 25);
+          if (answers.preferredSpecies && pet.species !== answers.preferredSpecies) score -= 30;
+          if (answers.preferredSize && pet.size !== answers.preferredSize) score -= 10;
+          if (answers.lifestyle === "active" && (pet.traits ?? []).includes("Energetic")) score += 5;
+          if (answers.lifestyle === "calm" && (pet.traits ?? []).includes("Calm")) score += 5;
+          const reasons = [
+            `Matches your ${answers.lifestyle} lifestyle perfectly.`,
+            `Great fit for a ${answers.homeType} environment.`,
+            `${pet.name}'s personality aligns with your preferences.`,
+            `Complements your activity level and living space.`,
+          ];
+          return { pet, score: Math.min(Math.max(score, 0), 99), reason: reasons[Math.floor(Math.random() * reasons.length)] };
+        })
+        .sort((a, b) => b.score - a.score);
 
-    setResults(mockResults);
-    setIsMatching(false);
+      setResults(scored);
+    } catch {
+      toast.error("Failed to load pets for matching");
+    } finally {
+      setIsMatching(false);
+    }
     
     // Save preferences to auth context
     if (user) {
@@ -132,50 +132,42 @@ export default function MatchPage() {
 
   if (results) {
     return (
-      <div className="container match-page" style={{ paddingBottom: 80, paddingLeft: "var(--container-px)", paddingRight: "var(--container-px)" }}>
+      <div className="container match-page" style={{ paddingTop: 40, paddingBottom: 80, paddingLeft: "var(--container-px)", paddingRight: "var(--container-px)" }}>
         <div style={{ padding: "60px 0 40px", textAlign: "center" }}>
           <div style={{ display: "inline-flex", padding: "8px 16px", background: "var(--color-amber-100)", borderRadius: "var(--radius-full)", marginBottom: 16 }}>
             <Sparkles size={16} color="var(--color-amber-600)" />
           </div>
           <h1 className="title-xl">Your Best Matches</h1>
           <p style={{ color: "var(--color-text-muted)", marginTop: 8 }}>
-            Our AI analyzed {PETS.length} pets to find your perfect companions.
+            Analyzed {results.length} pets to find your perfect companions.
           </p>
-          <button 
-            onClick={() => setResults(null)}
-            className="btn btn-ghost btn-sm"
-            style={{ marginTop: 16 }}
-          >
+          <button onClick={() => setResults(null)} className="btn btn-ghost btn-sm" style={{ marginTop: 16 }}>
             Retake Quiz
           </button>
         </div>
-
-        <div className="grid-cols-mobile">
-          {results.slice(0, 6).map((res, i) => {
-            const pet = PETS.find(p => p.id === res.petId);
-            if (!pet) return null;
-            return (
-              <PetCard 
-                key={pet.id} 
-                pet={pet} 
-                index={i} 
-                matchScore={res.score} 
-                matchReason={res.reason} 
-              />
-            );
-          })}
-        </div>
+        {results.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--color-text-muted)" }}>
+            No pets available yet. <Link href="/pets" style={{ color: "var(--color-amber-600)", fontWeight: 700 }}>Browse all pets</Link>
+          </div>
+        ) : (
+          <div className="grid-cols-mobile">
+            {results.slice(0, 6).map((res, i) => (
+              <PetCard key={res.pet.id} pet={res.pet} index={i} matchScore={res.score} matchReason={res.reason} />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="container match-page" style={{ 
-      minHeight: "calc(100vh - 64px)", 
-      display: "flex", 
-      alignItems: "center", 
+    <div className="container match-page" style={{
+      minHeight: "calc(100vh - 64px)",
+      display: "flex",
+      alignItems: "center",
       justifyContent: "center",
-      padding: "20px var(--container-px)"
+      paddingTop: 48,
+      paddingBottom: 48,
     }}>
       <div style={{ width: "100%", maxWidth: 640 }}>
         

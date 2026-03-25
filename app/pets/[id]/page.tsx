@@ -1,36 +1,63 @@
 "use client";
-import { use, useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Heart, MapPin, Scale, Syringe, CheckCircle, 
-  MessageCircle, ArrowLeft, Calendar, User, 
+import { use, useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  Heart, MapPin, Syringe, MessageCircle, ArrowLeft, Calendar,
   ChevronRight, ArrowRight, ShieldCheck, Download,
-  ExternalLink, Phone, Mail, Info
+  Phone, Mail, Info, Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getPetById, getShelterById } from "@/data/mockData";
+import { getFirestorePetById, getFirestoreShelterById, createApplication } from "@/lib/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { Pet, Shelter } from "@/types";
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
 
-// Dynamic import for Leaflet map to avoid SSR issues
-const PetMap = dynamic(() => import("@/components/pets/PetMap"), { 
+const PetMap = dynamic(() => import("@/components/pets/PetMap"), {
   ssr: false,
-  loading: () => <div style={{ height: 300, background: "var(--color-surface-2)", borderRadius: "var(--radius-lg)" }} />
+  loading: () => <div style={{ height: 300, background: "var(--color-surface-2)", borderRadius: "var(--radius-lg)" }} />,
 });
 
 export default function PetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { user, toggleSavePet } = useAuth();
-  
-  const pet = useMemo(() => getPetById(id), [id]);
-  const shelter = useMemo(() => pet ? getShelterById(pet.shelterId) : null, [pet]);
-  
+
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [shelter, setShelter] = useState<Shelter | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activePhoto, setActivePhoto] = useState(0);
   const [isApplying, setIsApplying] = useState(false);
+
   const isSaved = user?.savedPets?.includes(id) ?? false;
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const petData = await getFirestorePetById(id);
+        setPet(petData);
+        if (petData?.shelterId) {
+          const shelterData = await getFirestoreShelterById(petData.shelterId);
+          setShelter(shelterData);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: "120px 0" }}>
+        <Loader2 size={40} style={{ animation: "spin-slow 1s linear infinite", color: "var(--color-amber-500)" }} />
+      </div>
+    );
+  }
 
   if (!pet) {
     return (
@@ -52,32 +79,62 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
     toast.success(isSaved ? "Removed from saved" : "Saved! 🐾");
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
+    if (!user) {
+      toast.error("Sign in to apply 💛");
+      router.push("/auth/login");
+      return;
+    }
     setIsApplying(true);
-    setTimeout(() => {
-      setIsApplying(false);
-      toast.success("Application submitted! 🐾");
+    try {
+      await createApplication({
+        petId: pet.id,
+        petName: pet.name,
+        userId: user.id,
+        userName: user.name,
+        shelterId: pet.shelterId,
+        status: "pending",
+        submittedAt: new Date().toISOString().split("T")[0],
+        homeType: user.preferences?.homeType || "unknown",
+        hasChildren: false,
+        hasOtherPets: false,
+        experience: user.preferences?.experience || "none",
+        motivation: "I would love to give this pet a forever home.",
+      });
+      toast.success("Application submitted! 🐾 Check your dashboard.");
       router.push("/dashboard");
-    }, 1500);
+    } catch (err) {
+      toast.error("Failed to submit application. Please try again.");
+      console.error(err);
+    } finally {
+      setIsApplying(false);
+    }
   };
 
   const startChat = () => {
     if (!user) {
       toast.error("Sign in to chat with shelters 💬");
+      router.push("/auth/login");
       return;
     }
-    router.push(`/chat?petId=${pet.id}`);
+    const params = new URLSearchParams({
+      petId: pet.id,
+      petName: pet.name,
+      shelterId: pet.shelterId,
+      shelterName: pet.shelterName,
+    });
+    router.push(`/chat?${params.toString()}`);
   };
 
   return (
     <div style={{ paddingBottom: 100 }}>
-      {/* ── Breadcrumbs & Actions ── */}
+      {/* Breadcrumbs */}
       <div className="container" style={{ padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Link href="/pets" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", fontWeight: 600, color: "var(--color-text-muted)" }}>
           <ArrowLeft size={16} />
           Back to Browse
         </Link>
-        <button 
+        <button
           onClick={handleSave}
           className="btn btn-secondary btn-sm"
           style={{ gap: 8, padding: "8px 16px" }}
@@ -89,34 +146,28 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
 
       <div className="container pet-detail-container">
         <div className="grid-layout" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 48, alignItems: "start" }}>
-          
-          {/* ── Left Column: Media & Bio ── */}
+
+          {/* Left Column */}
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
             {/* Photo Gallery */}
             <div style={{ position: "relative" }}>
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 style={{ aspectRatio: "4/3", borderRadius: "var(--radius-xl)", overflow: "hidden", background: "var(--color-surface-2)", border: "1px solid var(--color-border)" }}
               >
-                <img 
-                  src={pet.photos[activePhoto]} 
-                  alt={pet.name} 
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }} 
-                />
+                <img src={pet.photos[activePhoto]} alt={pet.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </motion.div>
-              
               {pet.photos.length > 1 && (
                 <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                   {pet.photos.map((url, i) => (
-                    <button 
+                    <button
                       key={i}
                       onClick={() => setActivePhoto(i)}
-                      style={{ 
-                        width: 80, height: 80, borderRadius: "var(--radius-md)", 
+                      style={{
+                        width: 80, height: 80, borderRadius: "var(--radius-md)",
                         overflow: "hidden", border: activePhoto === i ? "2.5px solid var(--color-amber-500)" : "2px solid transparent",
-                        padding: 0, cursor: "pointer", opacity: activePhoto === i ? 1 : 0.7,
-                        transition: "all 0.2s ease"
+                        padding: 0, cursor: "pointer", opacity: activePhoto === i ? 1 : 0.7, transition: "all 0.2s ease"
                       }}
                     >
                       <img src={url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -129,21 +180,15 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
             {/* Bio */}
             <div>
               <h2 className="title-lg" style={{ marginBottom: 16 }}>About {pet.name}</h2>
-              <p style={{ fontSize: "1rem", color: "var(--color-text)", lineHeight: 1.8 }}>
-                {pet.bio}
-              </p>
-              
-              {/* Traits Tags */}
+              <p style={{ fontSize: "1rem", color: "var(--color-text)", lineHeight: 1.8 }}>{pet.bio}</p>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 24 }}>
-                {pet.traits.map(t => (
-                  <span key={t} className="tag active" style={{ fontSize: "0.85rem", padding: "6px 14px" }}>
-                    {t}
-                  </span>
+                {pet.traits.map((t) => (
+                  <span key={t} className="tag active" style={{ fontSize: "0.85rem", padding: "6px 14px" }}>{t}</span>
                 ))}
               </div>
             </div>
 
-            {/* Detailed Info Cards */}
+            {/* Info Cards */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               <div className="card" style={{ padding: 20, background: "var(--color-surface-2)", border: "none" }}>
                 <h4 style={{ fontSize: "0.85rem", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Physical Info</h4>
@@ -162,7 +207,6 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
                   </div>
                 </div>
               </div>
-
               <div className="card" style={{ padding: 20, background: "var(--color-surface-2)", border: "none" }}>
                 <h4 style={{ fontSize: "0.85rem", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 12 }}>Lifestyle</h4>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -186,7 +230,6 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
                 </div>
                 <h2 className="title-lg">Verified Medical History</h2>
               </div>
-              
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {pet.medicalRecords.map((rec) => (
                   <div key={rec.id} className="card" style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -194,30 +237,25 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
                       <Calendar size={18} color="var(--color-text-light)" />
                       <div>
                         <p style={{ fontWeight: 700, fontSize: "0.9rem" }}>{rec.name}</p>
-                        <p style={{ fontSize: "0.78rem", color: "var(--color-text-muted)" }}>{rec.date} • {rec.vet}</p>
+                        <p style={{ fontSize: "0.78rem", color: "var(--color-text-muted)" }}>{rec.date} · {rec.vet}</p>
                       </div>
                     </div>
-                    <button className="btn btn-ghost btn-icon">
-                      <Download size={16} />
-                    </button>
+                    <button className="btn btn-ghost btn-icon"><Download size={16} /></button>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* ── Right Column: Application & Shelter ── */}
+          {/* Right Column */}
           <div className="pet-detail-sticky" style={{ display: "flex", flexDirection: "column", gap: 32, position: "sticky", top: 100 }}>
-            
-            {/* Header Info */}
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <span className={`badge badge-teal`} style={{ fontSize: "0.85rem" }}>Available</span>
+                <span className={`badge ${pet.status === "available" ? "badge-teal" : "badge-amber"}`} style={{ fontSize: "0.85rem", textTransform: "capitalize" }}>{pet.status}</span>
                 <span style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>Posted {pet.postedAt}</span>
               </div>
               <h1 className="title-display" style={{ fontSize: "3rem", marginBottom: 8 }}>{pet.name}</h1>
               <p style={{ fontSize: "1.2rem", color: "var(--color-text-muted)" }}>{pet.breed}</p>
-              
               <div style={{ display: "flex", gap: 24, marginTop: 24, padding: "16px 0", borderTop: "1px solid var(--color-border)", borderBottom: "1px solid var(--color-border)" }}>
                 <div>
                   <p style={{ fontSize: "0.75rem", color: "var(--color-text-light)", textTransform: "uppercase", fontWeight: 700 }}>Age</p>
@@ -240,30 +278,34 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
                 <span style={{ fontSize: "0.9rem", color: "var(--color-text-muted)" }}>Adoption Fee</span>
                 <span style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--color-amber-600)" }}>${pet.adoptionFee}</span>
               </div>
-              
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <button 
+                <button
                   onClick={handleApply}
-                  disabled={isApplying}
-                  className="btn btn-primary" 
+                  disabled={isApplying || pet.status !== "available"}
+                  className="btn btn-primary"
                   style={{ width: "100%", height: 52, fontSize: "1rem" }}
                 >
-                  {isApplying ? "Submitting..." : `Apply to Adopt ${pet.name}`}
+                  {isApplying ? (
+                    <><Loader2 size={18} style={{ animation: "spin-slow 0.8s linear infinite" }} /> Submitting...</>
+                  ) : pet.status !== "available" ? (
+                    "Not Available"
+                  ) : (
+                    `Apply to Adopt ${pet.name}`
+                  )}
                 </button>
-                <button 
+                <button
                   onClick={startChat}
-                  className="btn btn-secondary" 
+                  className="btn btn-secondary"
                   style={{ width: "100%", height: 52, fontSize: "1rem" }}
                 >
                   <MessageCircle size={18} />
                   Message Shelter
                 </button>
               </div>
-              
               <div style={{ marginTop: 20, display: "flex", gap: 10, alignItems: "center", padding: "12px", background: "var(--color-amber-50)", borderRadius: "var(--radius-md)" }}>
                 <Info size={16} color="var(--color-amber-600)" style={{ flexShrink: 0 }} />
                 <p style={{ fontSize: "0.78rem", color: "var(--color-amber-700)", lineHeight: 1.4 }}>
-                  Matching with this pet? <Link href="/match" style={{ textDecoration: "underline", fontWeight: 700 }}>Take the AI Match test</Link> to see how you both fit.
+                  Want to check compatibility? <Link href="/match" style={{ textDecoration: "underline", fontWeight: 700 }}>Take the AI Match test</Link>.
                 </p>
               </div>
             </div>
@@ -280,14 +322,7 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
                     <p style={{ fontSize: "0.82rem", color: "var(--color-text-muted)" }}>Located in {shelter.city}, {shelter.state}</p>
                   </div>
                 </div>
-
-                <PetMap 
-                  lat={shelter.location.lat} 
-                  lng={shelter.location.lng} 
-                  shelterName={shelter.name}
-                  address={shelter.address}
-                />
-
+                <PetMap lat={shelter.location.lat} lng={shelter.location.lng} shelterName={shelter.name} address={shelter.address} />
                 <div className="card" style={{ padding: 16 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                     <MapPin size={16} color="var(--color-text-light)" />
@@ -307,10 +342,10 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
           </div>
         </div>
       </div>
-      
+
       {/* Mobile Floating Actions */}
       <div className="mobile-only mobile-actions-bar">
-        <button onClick={handleApply} disabled={isApplying} className="btn btn-primary">
+        <button onClick={handleApply} disabled={isApplying || pet.status !== "available"} className="btn btn-primary">
           {isApplying ? "..." : "Apply"}
         </button>
         <button onClick={startChat} className="btn btn-secondary">
